@@ -1,0 +1,44 @@
+name: 'nyc_taxi'
+version: '1.0.0'
+config-version: 2
+profile: 'nyc_taxi'
+
+model-paths: ["models"]
+seed-paths:  ["seeds"]
+test-paths:  ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+
+vars:
+  taxi_load_year: 2022          # Phase 1: 2022 only
+  taxi_load_month: null         # null = all months for full-year load
+  weather_start_date: '2021-01-01'
+  weather_end_date:   '2022-12-31'
+
+tests:
+  +store_failures: false
+
+seeds:
+  nyc_taxi:
+    taxi_zone_lookup:
+      +column_types:
+        LocationID: integer
+        Borough: varchar
+        Zone: varchar
+        service_zone: varchar
+
+models:
+  nyc_taxi:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
+      fct_trips:
+        +materialized: incremental
+      fct_daily_demand:
+        +materialized: incremental

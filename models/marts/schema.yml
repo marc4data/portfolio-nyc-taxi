@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: fct_trips
+    description: >
+      Core fact table. One row per yellow taxi trip.
+      Grain: trip_id (surrogate key).
+      Incremental (merge) — partitioned by pickup_date, clustered on pickup_location_id.
+      Joins zone attributes (from int_trips_enriched) and weather (from stg_weather).
+      Quality indicators (_ind columns) use 1/0 — sum()=count, avg()=rate.
+    columns:
+      - name: trip_id
+        description: 'Surrogate PK'
+        tests: [not_null, unique]
+      - name: pickup_date
+        tests: [not_null]
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+      - name: dropoff_location_id
+        tests:
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+      - name: fare_amount
+        tests: [not_null]
+      - name: total_amount
+        tests: [not_null]
+      - name: is_null_batch_ind
+        tests: [{accepted_values: {values: [0, 1]}}]
+      - name: negative_fare_ind
+        tests: [{accepted_values: {values: [0, 1]}}]
+      - name: airport_pickup_ind
+        tests: [{accepted_values: {values: [0, 1]}}]
+      - name: payment_type_label
+        tests:
+          - accepted_values:
+              values: ['credit_card', 'cash', 'no_charge', 'dispute', 'unknown']
+
+  - name: fct_daily_demand
+    description: >
+      Aggregated fact: one row per zone per day. Used as Prophet forecasting input.
+      Grain: demand_id = MD5(pickup_location_id | pickup_date).
+      Revenue metrics exclude negative_fare_ind=1 rows.
+      Weather columns join from stg_weather on pickup_date.
+    columns:
+      - name: demand_id
+        tests: [not_null, unique]
+      - name: pickup_date
+        tests: [not_null]
+      - name: pickup_location_id
+        tests: [not_null]
+      - name: trip_count
+        tests: [not_null]
+
+  - name: dim_zones
+    description: 'TLC taxi zone lookup. 265 rows. Loaded from dbt seed taxi_zone_lookup.csv.'
+    columns:
+      - name: location_id
+        tests: [not_null, unique]
+      - name: borough
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr']
+      - name: is_airport_zone
+        tests: [{accepted_values: {values: [0, 1]}}]
+
+  - name: dim_date
+    description: >
+      Date spine from 2019-01-01 to 2025-12-31. One row per calendar date.
+      Includes COVID period flags for Phase 2 year-over-year analysis.
+    columns:
+      - name: date
+        tests: [not_null, unique]

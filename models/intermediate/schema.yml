@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: int_trips_enriched
+    description: >
+      Yellow taxi trips enriched with zone lookup attributes (borough, zone name,
+      service zone) for both pickup and dropoff locations. One row per trip.
+      Grain: trip_id (inherited from stg_yellow_trips).
+      Zone join is LEFT JOIN — all trips are preserved even if location_id has no match.
+      Weather does NOT join here — see fct_trips.
+    columns:
+      - name: trip_id
+        tests: [not_null, unique]
+      - name: pickup_borough
+        description: 'NULL for ~0.1% of trips where zone lookup has no match'
+      - name: cross_borough_ind
+        tests:
+          - accepted_values: {values: [0, 1]}
+
+  - name: int_daily_demand
+    description: >
+      Trip-level data aggregated to zone+day grain. One row per pickup_location_id per pickup_date.
+      Used as input for fct_daily_demand and the Prophet forecasting model.
+      Revenue metrics exclude negative_fare_ind=1 rows.
+      Averages exclude is_null_batch_ind=1 rows.
+    columns:
+      - name: pickup_date
+        tests: [not_null]
+      - name: pickup_location_id
+        tests: [not_null]
+      - name: trip_count
+        tests: [not_null]

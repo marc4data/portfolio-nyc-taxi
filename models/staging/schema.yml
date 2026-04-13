@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: stg_yellow_trips
+    description: >
+      Staging model for raw yellow taxi trips. One row per trip.
+      Grain: trip_id — surrogate key (MD5 of vendor_id | pickup_datetime | pickup_location_id).
+      Scope: filtered to data_file_year = var('taxi_load_year').
+      All NUMERIC source columns cast to FLOAT. Location IDs cast from STRING to INT.
+      Indicator fields (_ind) use 1/0 convention: sum()=count, avg()=rate.
+      NULL batch: ~3.43% of 2022 rows have simultaneous NULLs on passenger_count,
+      rate_code, store_and_fwd_flag — flagged with is_null_batch_ind, retained.
+    columns:
+      - name: trip_id
+        description: 'Surrogate PK. MD5 hash of vendor_id|pickup_datetime|pickup_location_id'
+        tests: [not_null, unique]
+      - name: pickup_datetime
+        tests: [not_null]
+      - name: pickup_date
+        tests: [not_null]
+      - name: pickup_location_id
+        description: 'Cast from STRING to INT. 262–263 distinct values.'
+        tests: [not_null]
+      - name: dropoff_location_id
+        tests: [not_null]
+      - name: fare_amount
+        tests: [not_null]
+      - name: total_amount
+        tests: [not_null]
+      - name: is_null_batch_ind
+        tests:
+          - not_null
+          - accepted_values: {values: [0, 1]}
+      - name: negative_fare_ind
+        tests:
+          - accepted_values: {values: [0, 1]}
+      - name: zero_distance_ind
+        tests:
+          - accepted_values: {values: [0, 1]}
+      - name: airport_pickup_ind
+        tests:
+          - accepted_values: {values: [0, 1]}
+      - name: payment_type
+        tests:
+          - accepted_values: {values: [0, 1, 2, 3, 4, 5]}
+      - name: payment_type_label
+        tests:
+          - accepted_values:
+              values: ['credit_card', 'cash', 'no_charge', 'dispute', 'unknown']
+
+  - name: stg_taxi_zones
+    description: '265 NYC taxi zones from the TLC zone lookup seed.'
+    columns:
+      - name: location_id
+        tests: [not_null, unique]
+      - name: borough
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr']
+
+  - name: stg_weather
+    description: 'NOAA GHCN-Daily — Central Park (USW00094728). One row per calendar date.'
+    columns:
+      - name: date
+        tests: [not_null, unique]
+      - name: temp_max_c
+        tests: [not_null]
+      - name: precipitation_mm
+        tests: [not_null]

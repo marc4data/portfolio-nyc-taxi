@@ -1,0 +1,66 @@
+version: 2
+
+sources:
+  - name: raw
+    database: taxi_portfolio
+    schema: raw
+    description: 'Raw NYC TLC trip data and NOAA weather loaded to Snowflake'
+
+    tables:
+      - name: yellow_taxi_trips
+        description: >
+          Yellow cab trip records. One row per trip.
+          Covers Yellow 2019–2022 (Phase 1: 2022 only via data_file_year var).
+          Note: December 2022 has only 57 rows in the public dataset —
+          effectively Jan–Nov 2022. Filter via data_file_year = var('taxi_load_year').
+        loaded_at_field: pickup_datetime
+        freshness:
+          warn_after:  {count: 7,  period: day}
+          error_after: {count: 14, period: day}
+        columns:
+          - name: vendor_id
+            description: 'Technology provider. Values: 1=CMT, 2=VeriFone, 5/6=undocumented'
+            tests: [not_null]
+          - name: pickup_datetime
+            tests: [not_null]
+          - name: dropoff_datetime
+            tests: [not_null]
+          - name: pickup_location_id
+            description: 'Pickup taxi zone ID — stored as STRING in source, not INTEGER'
+            tests: [not_null]
+          - name: dropoff_location_id
+            description: 'Dropoff taxi zone ID — stored as STRING in source'
+            tests: [not_null]
+          - name: fare_amount
+            description: 'Metered fare. NUMERIC type — cast to FLOAT. Contains negatives (refunds).'
+            tests: [not_null]
+          - name: total_amount
+            description: 'Total charged. NUMERIC type — cast to FLOAT. Contains negatives.'
+            tests: [not_null]
+          - name: data_file_year
+            description: 'Partition helper — use for incremental load filtering'
+            tests: [not_null]
+          - name: data_file_month
+            description: 'Partition helper — use for monthly incremental loading'
+
+      - name: weather_daily
+        description: >
+          NOAA Global Historical Climatology Network — Central Park station USW00094728.
+          One row per calendar date. Units are tenths (temp = tenths of °C, precip = tenths of mm).
+          Convert in stg_weather.
+        loaded_at_field: date
+        columns:
+          - name: date
+            tests: [not_null, unique]
+          - name: tmax
+            description: 'Max temperature in tenths of degrees Celsius'
+          - name: tmin
+            description: 'Min temperature in tenths of degrees Celsius'
+          - name: prcp
+            description: 'Precipitation in tenths of mm'
+          - name: snow
+            description: 'Snowfall in mm'
+          - name: snwd
+            description: 'Snow depth in mm'
+          - name: awnd
+            description: 'Average wind speed'
