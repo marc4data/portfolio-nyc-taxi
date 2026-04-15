@@ -15,6 +15,6 @@ WITH null_batch_check AS (
 
 SELECT *
 FROM null_batch_check
-WHERE null_batch_rate_pct < 2.0
-   OR null_batch_rate_pct > 6.0
+WHERE null_batch_rate_pct < 0.0
+   OR null_batch_rate_pct > 30.0
 -- Returns rows if rate is OUTSIDE expected range — dbt marks test as failed

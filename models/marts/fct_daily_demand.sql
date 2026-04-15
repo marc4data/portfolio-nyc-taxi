@@ -1,8 +1,6 @@
 {{ config(
-    materialized         = 'incremental',
-    unique_key           = 'demand_id',
-    incremental_strategy = 'merge',
-    cluster_by           = ['pickup_date']
+    materialized         = 'table',
+    cluster_by           = ['pickup_date', 'pickup_location_id']
 ) }}
 
 -- Zone+day fact. One row per pickup_location_id per pickup_date.
@@ -11,12 +9,7 @@
 -- Lookback window = 7 days on incremental to handle late-arriving source data.
 
 WITH daily AS (
-
     SELECT * FROM {{ ref('int_daily_demand') }}
-    {% if is_incremental() %}
-    WHERE pickup_date >= (SELECT MAX(pickup_date) - 7 FROM {{ this }})
-    {% endif %}
-
 ),
 
 weather AS (
@@ -63,12 +56,12 @@ final AS (
         d.overnight_trips,
 
         -- Weather (day grain — same for all zones on a given date)
-        w.temp_max_c,
-        w.temp_min_c,
-        w.temp_avg_c,
-        w.precipitation_mm,
-        w.snowfall_mm,
-        w.snow_depth_mm,
+        w.temp_max_f,
+        w.temp_min_f,
+        w.temp_avg_f,
+        w.precipitation_in,
+        w.snowfall_in,
+        w.snow_depth_in,
         w.rain_day_ind,
         w.snow_day_ind,
         w.freezing_day_ind
