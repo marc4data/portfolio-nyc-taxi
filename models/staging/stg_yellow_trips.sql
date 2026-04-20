@@ -18,13 +18,19 @@ renamed AS (
     SELECT
 
         -- ── Surrogate primary key ─────────────────────────────────────────────
-        -- No natural PK in source. MD5 of vendor + pickup time + pickup zone.
+        -- No natural PK in source. vendor + pickup time + dropoff time +
+        -- pickup zone + dropoff zone + fare provides enough entropy to be unique.
+        -- vendor|pickup_datetime alone is not granular enough — multiple trips
+        -- can start at the same second from the same zone (rush hour, busy zones).
         -- Snowflake MD5() returns a hex string directly (no TO_HEX wrapper needed).
         MD5(CONCAT(
-            COALESCE(CAST(vendor_id AS VARCHAR),          'null'), '|',
-            CAST(pickup_datetime AS VARCHAR),                      '|',
-            COALESCE(CAST(pickup_location_id AS VARCHAR), 'null')
-        ))                                                           AS trip_id,
+            COALESCE(CAST(vendor_id AS VARCHAR),           'null'), '|',
+            COALESCE(CAST(pickup_datetime AS VARCHAR),     'null'), '|',
+            COALESCE(CAST(dropoff_datetime AS VARCHAR),    'null'), '|',
+            COALESCE(CAST(pickup_location_id AS VARCHAR),  'null'), '|',
+            COALESCE(CAST(dropoff_location_id AS VARCHAR), 'null'), '|',
+            COALESCE(CAST(fare_amount AS VARCHAR),         'null')
+        ))                                                            AS trip_id,
 
         -- ── Timestamps ────────────────────────────────────────────────────────
         pickup_datetime,

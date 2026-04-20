@@ -16,3 +16,12 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+
+# Notebook / HTML exports
+*.html
+
+# Excel temp files
+~$*
+
+# Notebook copies (backup/scratch)
+*copy*.ipynb
