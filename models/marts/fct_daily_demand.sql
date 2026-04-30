@@ -16,6 +16,10 @@ weather AS (
     SELECT * FROM {{ ref('stg_weather') }}
 ),
 
+dim_date AS (
+    SELECT * FROM {{ ref('dim_date') }}
+),
+
 final AS (
 
     SELECT
@@ -25,18 +29,42 @@ final AS (
             CAST(d.pickup_date AS VARCHAR)
         ))                                          AS demand_id,
 
+        -- Date + derived date attributes (features for forecasting models)
         d.pickup_date,
+        YEAR(d.pickup_date)                         AS pickup_year,
+        MONTH(d.pickup_date)                        AS pickup_month,
+        DAYOFWEEK(d.pickup_date)                    AS day_of_week,
+        CASE WHEN DAYOFWEEK(d.pickup_date) IN (0, 6) THEN 1 ELSE 0 END      AS is_weekend,
+        dd.is_holiday                               AS is_holiday,
+
+        -- Geography
         d.pickup_location_id,
         d.pickup_borough,
         d.pickup_zone,
+        d.pickup_service_zone,                      -- added: needed for zone-type filtering (airport vs street hail)
 
-        -- Volume
+        -- Volume (raw)
         d.trip_count,
         d.airport_pickup_count,
         d.null_batch_trip_count,
-        d.negative_fare_count,
+        d.fare_exception_count,
         d.zero_distance_count,
         d.cross_borough_count,
+
+        -- Volume (model-ready target)
+        -- Excludes null-batch trips (data artifacts, not real demand).
+        -- zero_distance_count is retained as a separate field; exclude downstream if desired.
+        d.trip_count - d.null_batch_trip_count      AS adjusted_trip_count,
+
+        -- Null batch quality flags (for filtering and QA)
+        CASE
+            WHEN d.null_batch_trip_count > 0 THEN 1
+            ELSE 0
+        END                                         AS has_null_batch_ind,
+        ROUND(
+            d.null_batch_trip_count / NULLIF(d.trip_count, 0) * 100,
+            2
+        )                                           AS null_batch_pct,
 
         -- Revenue
         d.total_fare_revenue,
@@ -62,12 +90,14 @@ final AS (
         w.precipitation_in,
         w.snowfall_in,
         w.snow_depth_in,
+        w.avg_wind_speed_mph,                       -- added: present in fct_trips, was missing here
         w.rain_day_ind,
         w.snow_day_ind,
         w.freezing_day_ind
 
     FROM daily d
     LEFT JOIN weather w ON d.pickup_date = w.date
+    LEFT JOIN dim_date dd ON d.pickup_date = dd.date
 
 )
 

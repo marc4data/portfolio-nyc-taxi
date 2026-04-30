@@ -37,13 +37,13 @@ models:
           - accepted_values: 
               arguments:
                 values: [0, 1]
-      - name: negative_fare_ind
+      - name: fare_exception_ind
         tests:
           - not_null
           - accepted_values: 
               arguments:
                 values: [0, 1]
-      - name: zero_distance_ind
+      - name: trip_distance_miles_exception_ind
         tests:
           - not_null
           - accepted_values: 
