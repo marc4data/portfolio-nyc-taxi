@@ -15,7 +15,9 @@ models:
         description: 'NULL for ~0.1% of trips where zone lookup has no match'
       - name: cross_borough_ind
         tests:
-          - accepted_values: {values: [0, 1]}
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
 
   - name: int_daily_demand
     description: >

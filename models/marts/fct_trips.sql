@@ -1,7 +1,5 @@
 {{ config(
-    materialized         = 'incremental',
-    unique_key           = 'trip_id',
-    incremental_strategy = 'merge',
+    materialized         = 'table',
     cluster_by           = ['pickup_date', 'pickup_location_id']
 ) }}
 
@@ -12,13 +10,14 @@
 WITH enriched AS (
 
     SELECT * FROM {{ ref('int_trips_enriched') }}
+    WHERE 1=1
+
+    {% if var('taxi_load_year', none) is not none %}
+        AND data_file_year = {{ var('taxi_load_year') }}
+    {% endif %}
+
     {% if is_incremental() %}
-    -- For incremental runs: load one year at a time via var
-    WHERE data_file_year = {{ var('taxi_load_year', 2022) }}
-      AND pickup_datetime >= (SELECT MAX(pickup_datetime) FROM {{ this }})
-    {% else %}
-    -- Full refresh: load the configured year
-    WHERE data_file_year = {{ var('taxi_load_year', 2022) }}
+        AND pickup_datetime >= (SELECT MAX(pickup_datetime) FROM {{ this }})
     {% endif %}
 
 ),
@@ -47,7 +46,7 @@ final AS (
         e.vendor_id,
         e.payment_type,
         e.payment_type_label,
-        e.rate_code,
+        e.rate_code_id,
         e.rate_code_label,
         e.store_and_fwd_flag,
 
@@ -77,27 +76,27 @@ final AS (
         e.total_amount,
 
         -- Weather (LEFT JOIN — NULL if weather data missing for that date)
-        w.temp_max_c            AS weather_temp_max_c,
-        w.temp_min_c            AS weather_temp_min_c,
-        w.temp_avg_c            AS weather_temp_avg_c,
-        w.precipitation_mm      AS weather_precip_mm,
-        w.snowfall_mm           AS weather_snow_mm,
-        w.snow_depth_mm         AS weather_snow_depth_mm,
-        w.avg_wind_speed        AS weather_avg_wind_speed,
+        w.temp_max_f            AS weather_temp_max_f,
+        w.temp_min_f            AS weather_temp_min_f,
+        w.temp_avg_f            AS weather_temp_avg_f,
+        w.precipitation_in      AS weather_precip_in,
+        w.snowfall_in           AS weather_snow_in,
+        w.snow_depth_in         AS weather_snow_depth_in,
+        w.avg_wind_speed_mph    AS weather_avg_wind_speed_mph,
         w.rain_day_ind          AS weather_rain_day_ind,
         w.snow_day_ind          AS weather_snow_day_ind,
         w.freezing_day_ind      AS weather_freezing_day_ind,
 
         -- Quality indicators (all 1/0)
-        e.is_null_batch_ind,
+        e.passenger_count_missing_ind,
         e.negative_fare_ind,
-        e.zero_distance_ind,
-        e.zero_passenger_ind,
         e.negative_duration_ind,
         e.long_duration_ind,
+        e.zero_distance_ind,
         e.airport_pickup_ind,
         e.airport_dropoff_ind,
-        e.jfk_flat_rate_ind
+        e.jfk_flat_rate_ind,
+        e.is_null_batch_ind
 
     FROM enriched e
     LEFT JOIN weather w ON e.pickup_date = w.date

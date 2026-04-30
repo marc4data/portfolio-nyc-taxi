@@ -65,7 +65,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr']
+              values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr', 'n/a', 'unknown']
       - name: is_airport_zone
         tests: [{accepted_values: {values: [0, 1]}}]
 

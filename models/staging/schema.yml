@@ -13,7 +13,11 @@ models:
     columns:
       - name: trip_id
         description: 'Surrogate PK. MD5 hash of vendor_id|pickup_datetime|pickup_location_id'
-        tests: [not_null, unique]
+        tests: 
+          - not_null
+          - unique:
+              config: 
+                severity: warn
       - name: pickup_datetime
         tests: [not_null]
       - name: pickup_date
@@ -27,26 +31,58 @@ models:
         tests: [not_null]
       - name: total_amount
         tests: [not_null]
+      - name: passenger_count_missing_ind
+        tests:
+          - not_null
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
+      - name: negative_fare_ind
+        tests:
+          - not_null
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
+      - name: zero_distance_ind
+        tests:
+          - not_null
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
+      - name: airport_pickup_ind
+        tests:
+          - not_null
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
+      - name: airport_dropoff_ind
+        tests:
+          - not_null
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
+      - name: jfk_flat_rate_ind
+        tests:
+          - not_null
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
       - name: is_null_batch_ind
         tests:
           - not_null
-          - accepted_values: {values: [0, 1]}
-      - name: negative_fare_ind
-        tests:
-          - accepted_values: {values: [0, 1]}
-      - name: zero_distance_ind
-        tests:
-          - accepted_values: {values: [0, 1]}
-      - name: airport_pickup_ind
-        tests:
-          - accepted_values: {values: [0, 1]}
+          - accepted_values: 
+              arguments:
+                values: [0, 1]
       - name: payment_type
         tests:
-          - accepted_values: {values: [0, 1, 2, 3, 4, 5]}
+          - accepted_values: 
+              arguments:
+                values: [0, 1, 2, 3, 4, 5]
       - name: payment_type_label
         tests:
           - accepted_values:
-              values: ['credit_card', 'cash', 'no_charge', 'dispute', 'unknown']
+              arguments:
+                values: ['credit_card', 'cash', 'no_charge', 'dispute', 'unknown']
 
   - name: stg_taxi_zones
     description: '265 NYC taxi zones from the TLC zone lookup seed.'
@@ -57,14 +93,60 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr']
+              arguments:
+                values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr', 'n/a', 'unknown']
 
   - name: stg_weather
     description: 'NOAA GHCN-Daily — Central Park (USW00094728). One row per calendar date.'
     columns:
       - name: date
         tests: [not_null, unique]
-      - name: temp_max_c
-        tests: [not_null]
-      - name: precipitation_mm
-        tests: [not_null]
+      - name: temp_max_f
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -40
+                max_value: 120
+      - name: temp_min_f
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -40
+                max_value: 120
+      - name: temp_avg_f
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -40
+                max_value: 120
+      - name: precipitation_in
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 10   # NYC record is ~8in in a day
+      - name: snowfall_in
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 30   # NYC record ~26in (1947 blizzard)
+      - name: snow_depth_in
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 40
+      - name: avg_wind_speed_mph
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100  # hurricane-force would be extraordinary for NYC

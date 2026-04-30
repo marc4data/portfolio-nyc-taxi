@@ -10,13 +10,10 @@ sources:
       - name: yellow_taxi_trips
         description: >
           Yellow cab trip records. One row per trip.
-          Covers Yellow 2019–2022 (Phase 1: 2022 only via data_file_year var).
-          Note: December 2022 has only 57 rows in the public dataset —
-          effectively Jan–Nov 2022. Filter via data_file_year = var('taxi_load_year').
-        loaded_at_field: pickup_datetime
-        freshness:
-          warn_after:  {count: 7,  period: day}
-          error_after: {count: 14, period: day}
+          Covers Yellow 2020–2025 (Phase 1: 2024-205 only via data_file_year var).
+          Filter via data_file_year = var('taxi_load_year').
+        # Historical dataset — freshness checks intentionally omitted.
+        # Re-enable if this moves to an incremental production pipeline.
         columns:
           - name: vendor_id
             description: 'Technology provider. Values: 1=CMT, 2=VeriFone, 5/6=undocumented'
@@ -48,7 +45,7 @@ sources:
           NOAA Global Historical Climatology Network — Central Park station USW00094728.
           One row per calendar date. Units are tenths (temp = tenths of °C, precip = tenths of mm).
           Convert in stg_weather.
-        loaded_at_field: date
+        # Historical dataset — freshness checks intentionally omitted.  
         columns:
           - name: date
             tests: [not_null, unique]
