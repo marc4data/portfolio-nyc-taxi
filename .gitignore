@@ -16,3 +16,18 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+
+# Notebook / HTML exports
+*.html
+
+# Excel temp files
+~$*
+
+# Notebook copies (backup/scratch)
+*copy*.ipynb
+
+# Versioned scratch files — *_v00.ipynb, *_v01.py, *_v05.sql, etc.
+*_v[0-9][0-9].*
+
+# Claude Code agent settings (project-wide + local overrides)
+.claude/
