@@ -140,6 +140,95 @@ class DISTRIBUTIONS:
             # panel_height = 4.0,             # height per panel (inches)
         )
 
+    def template_plot_histograms():
+        """Multi-field histogram grid — one panel per field, independent X-axis,
+        bins centered on integers, Y-axis as % of total."""
+        plot_histograms(
+            df     = hist_df,                     # DataFrame containing all fields
+            fields = [                            # list of numeric columns — one panel each
+                'is_holiday',
+                'is_weekend',
+                'day_of_week',
+                'pickup_month',
+                'pickup_year',
+            ],
+
+            # ── Layout ────────────────────────────────────────────────────
+            # max_cols     = 3,                   # max panels per row before wrapping
+            # panel_width  = 3.5,                 # width per panel (inches)
+            # panel_height = 3.0,                 # height per panel (inches)
+
+            # ── Bins / labels ─────────────────────────────────────────────
+            # bin_incr        = 1,                # bin width (1 = one bar per integer value)
+            # label_threshold = None,             # int N: panels w/ < N bars get % labels (None = never)
+        )
+
+    def template_plot_field_aggregates():
+        """Bar chart comparing an aggregate (sum, mean, etc.) across multiple fields."""
+        plot_field_aggregates(
+            df     = sample_df,                   # DataFrame containing all fields
+            fields = [                            # list of numeric columns — one bar per field
+                'trip_count',
+                'adjusted_trip_count',
+                'airport_pickup_count',
+                'cross_borough_count',
+                'cash_trips',
+                'evening_rush_trips',
+                'morning_rush_trips',
+                'credit_card_trips',
+                'overnight_trips',
+            ],
+
+            # ── Aggregation ───────────────────────────────────────────────
+            # agg          = 'sum',               # 'sum', 'mean', 'median', 'min', 'max', 'count', 'std', or callable
+            # sort         = 'desc',              # 'desc', 'asc', or None (keep input order)
+
+            # ── Layout ────────────────────────────────────────────────────
+            # orientation  = 'horizontal',        # 'horizontal' (best for long names) or 'vertical'
+            # color        = '#888888',           # bar fill color
+            # show_labels  = True,                # annotate each bar with formatted value
+            # panel_width  = None,                # figure width (default auto)
+            # panel_height = None,                # figure height (default auto, scales w/ n_fields)
+            # title        = None,                # default = '<AGG> by Field'
+        )
+
+    def template_plot_field_aggregates_by_group():
+        """Small-multiples horizontal bar chart — one panel per group value
+        (e.g. one per borough), each panel shows the aggregate of every field
+        for that group's subset. Auto-colors panels via BOROUGH_COLORS."""
+        plot_field_aggregates_by_group(
+            df          = sample_df,              # DataFrame containing all fields
+            group_field = 'borough',              # categorical column — one panel per unique value
+            fields      = [                       # list of numeric columns
+                'trip_count',
+                'adjusted_trip_count',
+                'airport_pickup_count',
+                'cross_borough_count',
+                'cash_trips',
+                'evening_rush_trips',
+                'morning_rush_trips',
+                'credit_card_trips',
+                'overnight_trips',
+            ],
+
+            # ── Aggregation / ordering ────────────────────────────────────
+            # agg          = 'sum',               # 'sum', 'mean', 'median', 'min', 'max', 'count', 'std', or callable
+            # sort         = 'shared_desc',       # 'shared_desc' (default — best for cross-panel compare),
+            #                                     # 'shared_asc', 'panel_desc', 'panel_asc', None (input order)
+
+            # ── Layout ────────────────────────────────────────────────────
+            # max_cols     = 3,                   # max panels per row before wrapping
+            # panel_width  = 4.5,                 # width per panel (inches)
+            # panel_height = None,                # default auto, scales w/ n_fields
+            # shared_x     = True,                # True = shared X-axis range (bar lengths comparable)
+
+            # ── Appearance ────────────────────────────────────────────────
+            # show_labels   = True,               # annotate each bar with formatted value
+            # color_map     = None,               # dict group→color. None = BOROUGH_COLORS
+            # default_color = '#888888',          # color for groups not in color_map
+            # suptitle      = None,               # default = '<AGG> of Fields by <Group>'
+        )
+
     def template_plot_boxplot():
         """Box-whisker with grouping, labels, strip overlay, and view constraints."""
         plot_boxplot(
@@ -181,6 +270,58 @@ class DISTRIBUTIONS:
             # ── Size ──────────────────────────────────────────────────────
             # panel_width  = None,            # width per panel (inches). Default = CHART_WIDTH / n_cols
             # panel_height = 4.0,             # height per panel (inches)
+        )
+
+
+class CORRELATIONS:
+    """Bivariate analysis — scatter and other two-measure relationships."""
+
+    def template_plot_scatter():
+        """Scatterplot of two numeric measures. Single-panel by default;
+        pass group_field='borough' to render small multiples (one panel per group)."""
+        plot_scatter(
+            df      = sample_df,              # DataFrame
+            x_field = 'trip_distance_miles',  # numeric column for X
+            y_field = 'fare_amount',          # numeric column for Y
+
+            # ── Mode ──────────────────────────────────────────────────────
+            # group_field   = None,           # None = single panel; e.g. 'borough' = grid
+            # color_field   = None,           # color individual points by this categorical field
+            #                                 # (e.g. color_field='borough' on a single-panel chart)
+
+            # ── Decorations ───────────────────────────────────────────────
+            # trend         = None,           # 'linear' = overlay regression line; None = skip
+            # correlation   = True,           # True = show Pearson r badge in corner
+            # log_x         = False,          # log-scale X
+            # log_y         = False,          # log-scale Y
+
+            # ── Manual axis limits (zoom past outliers) ──────────────────
+            # x_max         = None,           # force upper bound on X (None = auto)
+            # y_max         = None,           # force upper bound on Y (None = auto)
+            # x_min         = None,           # force lower bound on X (None = auto)
+            # y_min         = None,           # force lower bound on Y (None = auto)
+
+            # ── Point appearance ──────────────────────────────────────────
+            # alpha         = 0.4,            # point transparency (lower = denser overplot OK)
+            # point_size    = 10,             # matplotlib `s` (points²)
+
+            # ── Performance ───────────────────────────────────────────────
+            # sample        = None,           # cap rendered points (e.g. 10_000) for huge frames
+            # sample_seed   = 42,             # random seed for reproducible sampling
+
+            # ── Grid mode layout ──────────────────────────────────────────
+            # max_cols      = 3,              # max panels per row before wrapping
+            # shared_axes   = True,           # True = shared X+Y across panels (for cross-compare)
+            # panel_width   = 4.0,            # width per panel (inches)
+            # panel_height  = 4.0,            # height per panel (inches)
+
+            # ── Color ─────────────────────────────────────────────────────
+            # color         = '#888888',      # single color when no palette applies
+            # color_map     = None,           # dict value→color. None = BOROUGH_COLORS
+            # default_color = '#888888',      # fallback for values not in color_map
+
+            # ── Title ─────────────────────────────────────────────────────
+            # title         = None,           # default auto: '<Y> vs <X>' or with 'by <Group>'
         )
 
 

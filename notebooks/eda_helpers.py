@@ -74,6 +74,22 @@ CARDINALITY_THRESHOLD_NUM = 50    # numeric fields
 TITLE_SM         = 10     # font size for titles on small/secondary panels (bar, DoW)
 
 
+# ── Font sizes — single source of truth for chart typography ──────────────────
+# Module-level constants used by chart helpers. Override at notebook level
+# to apply across every chart in a report:
+#     import eda_helpers
+#     eda_helpers.FONT_TITLE = 14
+# Goal: uniform typography across all charts in an EDA report (nb2report HTML).
+FONT_TITLE       = 17     # ax.set_title for single-chart helpers
+FONT_SUPTITLE    = 18     # fig.suptitle for multi-panel grids
+FONT_AXIS_LABEL  = 15     # x/y axis names
+FONT_TICK        = 13     # tick labels (numbers/categories on axes)
+FONT_BAR_VALUE   = 12     # value annotations on bars
+FONT_PANEL_TITLE = 15     # individual panel titles in small-multiples
+FONT_BADGE       = 12     # r-value pills, n=... stats subtitles
+FONT_LEGEND      = 10     # legend text within panels
+
+
 BOROUGH_COLORS = {
     'manhattan':      '#1f77b4',  # blue   — dominant borough
     'queens':         '#ff7f0e',  # orange
@@ -2278,6 +2294,570 @@ def plot_histogram(df, hist_field, bin_cnt=20, bin_incr=None,
                 ax.set_ylabel('')
 
     plt.tight_layout(pad=0.5)
+    plt.show()
+
+
+def plot_histograms(df, fields, max_cols=3, panel_width=3.5, panel_height=3.0,
+                    bin_incr=1, label_threshold=None):
+    """
+    Multi-field histogram grid — one panel per field, independent X-axis per panel.
+
+    Built for discrete integer fields with very different ranges
+    (e.g. is_holiday 0/1, day_of_week 1-7, pickup_month 1-12, pickup_year 2022).
+    Each panel is binned and scaled to its own field. Y-axis is % of total.
+    Bins are centered on integers so each integer value gets its own bar.
+
+    Layout follows plot_indicators: wraps to multiple rows when
+    len(fields) > max_cols. Y-axis is NOT shared (each panel scales to its own %).
+
+    Parameters
+    ----------
+    df              : DataFrame containing all fields
+    fields          : list of numeric column names — one panel per field
+    max_cols        : max columns per row before wrapping (default 3)
+    panel_width     : width per panel in inches (default 3.5)
+    panel_height    : height per panel in inches (default 3.0)
+    bin_incr        : bin width in integer units (default 1 = one bar per integer)
+    label_threshold : if set to integer N, panels with fewer than N bars print
+                      the % on top of each bar. Panels with >= N bars stay
+                      unlabeled to avoid clutter. Default None = never label.
+    """
+    n_fields = len(fields)
+    n_cols   = min(n_fields, max_cols)
+    n_rows   = -(-n_fields // max_cols)   # ceiling division
+
+    fig_w = panel_width * n_cols
+    fig_h = panel_height * n_rows
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(fig_w, fig_h), dpi=CHART_DPI,
+                             squeeze=False, sharey=False, sharex=False)
+
+    for idx, field in enumerate(fields):
+        r = idx // max_cols
+        c = idx % max_cols
+        ax = axes[r, c]
+
+        col_data = df[field].dropna()
+        n_total  = len(col_data)
+
+        if n_total == 0:
+            ax.set_visible(False)
+            continue
+
+        # Integer-centered bins (independent per field). Offset by half so each
+        # integer value lands in the center of its own bar — e.g. for 0/1 data,
+        # bins=[-0.5, 0.5, 1.5] → bar at x=0 captures 0s, bar at x=1 captures 1s.
+        data_min = int(math.floor(col_data.min()))
+        data_max = int(math.ceil(col_data.max()))
+        half = bin_incr / 2.0
+        bins = np.arange(data_min - half, data_max + half + bin_incr, bin_incr)
+
+        n_bars = len(bins) - 1
+        show_labels = label_threshold is not None and n_bars < label_threshold
+
+        _draw_histogram(ax, df, field, bins,
+                        color='#888888', pct=True,
+                        title=None, show_labels=show_labels)
+
+        ax.set_xlabel('')
+        if c > 0:
+            ax.set_ylabel('')
+
+        # Integer x-ticks when range is small enough to label every value
+        n_ticks = data_max - data_min + 1
+        if n_ticks <= 15:
+            ax.set_xticks(range(data_min, data_max + 1))
+
+        clean_name = field.replace('_', ' ').title()
+        wrapped    = _wrap_title(clean_name, max_chars=18)
+        ax.set_title(wrapped, fontsize=FONT_PANEL_TITLE, fontweight='bold',
+                     linespacing=1.1, pad=28)
+
+        stats_text = f'n={fmt_num(n_total)}'
+        ax.text(0.5, 1.08, stats_text, transform=ax.transAxes,
+                ha='center', va='bottom', fontsize=FONT_BADGE, color='#666')
+
+        ax.tick_params(axis='both', labelsize=FONT_TICK)
+
+    # Hide unused panels in the trailing row
+    for idx in range(n_fields, n_rows * n_cols):
+        r = idx // max_cols
+        c = idx % max_cols
+        axes[r, c].set_visible(False)
+
+    plt.tight_layout(pad=0.5)
+    plt.show()
+
+
+def plot_field_aggregates(df, fields, agg='sum', sort='desc',
+                          orientation='horizontal', color='#888888',
+                          show_labels=True, panel_width=None,
+                          panel_height=None, title=None):
+    """
+    Bar chart comparing an aggregate (sum, mean, etc.) across multiple fields.
+
+    Built for comparing related numeric/count columns at a glance — e.g.
+    trip_count vs airport_pickup_count vs cash_trips vs credit_card_trips.
+    Each bar is one field; bar value = agg(df[field]).
+
+    Parameters
+    ----------
+    df           : DataFrame
+    fields       : list of numeric column names — one bar per field
+    agg          : aggregation (str or callable). Default 'sum'.
+                   Common: 'sum', 'mean', 'median', 'min', 'max', 'count', 'std'.
+                   Any callable returning a scalar from a Series also works.
+    sort         : 'desc' (default), 'asc', or None to keep input order
+    orientation  : 'horizontal' (default — best for long field names) or 'vertical'
+    color        : single bar fill color (default medium gray)
+    show_labels  : annotate each bar with its formatted value (default True)
+    panel_width  : figure width in inches (default auto)
+    panel_height : figure height in inches (default auto, scales with n_fields)
+    title        : chart title (default: '<AGG> by Field')
+
+    Typography is governed by the module-level FONT_* constants — change those
+    once at the top of your notebook to apply across every chart in the report.
+    """
+    n = len(fields)
+
+    # df[fields].agg(agg) returns a Series indexed by field name
+    totals = df[fields].agg(agg)
+
+    if sort == 'desc':
+        totals = totals.sort_values(ascending=False)
+    elif sort == 'asc':
+        totals = totals.sort_values(ascending=True)
+
+    # Auto figure sizing — height grows with field count for horizontal,
+    # width grows for vertical
+    if orientation == 'horizontal':
+        fig_w = panel_width  or CHART_WIDTH
+        fig_h = panel_height or max(2.5, n * 0.45)
+    else:
+        fig_w = panel_width  or max(6, n * 0.9)
+        fig_h = panel_height or 4.5
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=CHART_DPI)
+
+    labels = [f.replace('_', ' ') for f in totals.index]
+    agg_label = agg.upper() if isinstance(agg, str) else 'Aggregate'
+
+    if orientation == 'horizontal':
+        # matplotlib barh stacks bottom-up, so reverse to put first item at top
+        plot_data = totals.iloc[::-1]
+        plot_labels = labels[::-1]
+        bars = ax.barh(plot_labels, plot_data.values, color=color, alpha=0.85,
+                       edgecolor='#1a1a1a', linewidth=0.5)
+        ax.set_xlabel(agg_label, fontsize=FONT_AXIS_LABEL)
+        ax.xaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, _: fmt_num(x)))
+        if show_labels:
+            for bar, val in zip(bars, plot_data.values):
+                ax.text(bar.get_width(), bar.get_y() + bar.get_height() / 2,
+                        f'  {fmt_num(val)}',
+                        va='center', ha='left', fontsize=FONT_BAR_VALUE)
+    else:
+        bars = ax.bar(labels, totals.values, color=color, alpha=0.85,
+                      edgecolor='#1a1a1a', linewidth=0.5)
+        ax.set_ylabel(agg_label, fontsize=FONT_AXIS_LABEL)
+        ax.yaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, _: fmt_num(x)))
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        if show_labels:
+            for bar, val in zip(bars, totals.values):
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                        f'{fmt_num(val)}',
+                        va='bottom', ha='center', fontsize=FONT_BAR_VALUE)
+
+    ax.tick_params(axis='both', labelsize=FONT_TICK)
+
+    ax.set_title(title or f'{agg_label} by Field',
+                 fontsize=FONT_TITLE, fontweight='bold')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.grid(True, axis='x' if orientation == 'horizontal' else 'y',
+            color='gray', alpha=0.3, linewidth=0.5)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_field_aggregates_by_group(df, fields, group_field, agg='sum',
+                                   sort='shared_desc', max_cols=3,
+                                   panel_width=4.5, panel_height=None,
+                                   shared_x=True, show_labels=True,
+                                   color_map=None, default_color='#888888',
+                                   suptitle=None):
+    """
+    Small-multiples bar chart — one panel per unique value of group_field,
+    each panel shows the aggregate of every field for that group's subset.
+
+    Built for cross-segment comparison (e.g. compare trip_count, cash_trips,
+    credit_trips across boroughs). Shared X-axis by default so bar lengths
+    are directly comparable across panels. Each panel is colored by group
+    (uses BOROUGH_COLORS by default).
+
+    Parameters
+    ----------
+    df            : DataFrame
+    fields        : list of numeric column names
+    group_field   : categorical column — one panel per unique value
+    agg           : aggregation (str or callable). Default 'sum'.
+                    Common: 'sum', 'mean', 'median', 'min', 'max', 'count', 'std'.
+    sort          : 'shared_desc' (default): sort fields by overall agg desc,
+                    use that order in every panel — best for cross-panel comparison.
+                    'shared_asc' : same, ascending.
+                    'panel_desc' : each panel sorts its own fields desc.
+                    None         : keep input field order.
+    max_cols      : max panels per row before wrapping (default 3)
+    panel_width   : width per panel in inches (default 4.5)
+    panel_height  : height per panel (default auto: scales with n_fields)
+    shared_x      : if True, all panels share the same X-axis range so bar
+                    lengths are directly comparable across groups (default True)
+    show_labels   : annotate each bar with formatted value (default True)
+    color_map     : dict mapping group value → color. None = use BOROUGH_COLORS.
+                    Lookup is case-insensitive for string group values.
+    default_color : color for group values not found in color_map
+    suptitle      : figure-level title (default: '<AGG> of Fields by <Group>')
+    """
+    if color_map is None:
+        color_map = BOROUGH_COLORS
+
+    # Aggregate per group: DataFrame indexed by group, columns = fields
+    per_group = df.groupby(group_field)[fields].agg(agg)
+
+    # Order panels by overall total — biggest group first
+    group_totals = per_group.sum(axis=1).sort_values(ascending=False)
+    group_values = group_totals.index.tolist()
+    n_groups = len(group_values)
+
+    # Determine field ordering used inside each panel
+    shared_modes = {'shared_desc', 'shared_asc', None}
+    if sort == 'shared_desc':
+        field_order = df[fields].agg(agg).sort_values(ascending=False).index.tolist()
+    elif sort == 'shared_asc':
+        field_order = df[fields].agg(agg).sort_values(ascending=True).index.tolist()
+    else:
+        field_order = list(fields)
+
+    # Common X-axis upper bound (with 15% headroom for labels)
+    x_max = per_group.values.max() * 1.15 if shared_x else None
+
+    n_fields = len(fields)
+    n_cols   = min(n_groups, max_cols)
+    n_rows   = -(-n_groups // max_cols)
+
+    panel_h  = panel_height or max(2.5, n_fields * 0.4)
+    fig_w    = panel_width * n_cols
+    fig_h    = panel_h * n_rows
+    # Scale fonts so on-screen size matches helpers that render at CHART_WIDTH —
+    # nb2report displays charts at uniform widths, so a narrower native render
+    # gets stretched and its fonts otherwise look "punchy" relative to wider charts.
+    scale = fig_w / CHART_WIDTH
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(fig_w, fig_h),
+                             dpi=CHART_DPI, squeeze=False, sharex=shared_x)
+
+    agg_label = agg.upper() if isinstance(agg, str) else 'Aggregate'
+
+    for idx, gv in enumerate(group_values):
+        r = idx // max_cols
+        c = idx % max_cols
+        ax = axes[r, c]
+
+        # Pick field order for this panel
+        if sort == 'panel_desc':
+            totals = per_group.loc[gv].sort_values(ascending=False)
+        elif sort == 'panel_asc':
+            totals = per_group.loc[gv].sort_values(ascending=True)
+        else:
+            totals = per_group.loc[gv].reindex(field_order)
+
+        # barh stacks bottom-up; reverse so first item ends up at top
+        plot_data = totals.iloc[::-1]
+        plot_labels = [f.replace('_', ' ') for f in plot_data.index]
+
+        # Color lookup — case-insensitive for strings
+        gv_key = gv.lower() if isinstance(gv, str) else gv
+        bar_color = color_map.get(gv_key, default_color)
+
+        bars = ax.barh(plot_labels, plot_data.values, color=bar_color,
+                       alpha=0.85, edgecolor='#1a1a1a', linewidth=0.5)
+
+        ax.xaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, _: fmt_num(x)))
+        if x_max is not None:
+            ax.set_xlim(0, x_max)
+
+        if show_labels:
+            for bar, val in zip(bars, plot_data.values):
+                ax.text(bar.get_width(), bar.get_y() + bar.get_height() / 2,
+                        f'  {fmt_num(val)}',
+                        va='center', ha='left', fontsize=FONT_BAR_VALUE * scale)
+
+        # Panel title (group value) + subtitle (overall total for this group)
+        title = str(gv).title() if isinstance(gv, str) else str(gv)
+        ax.set_title(title, fontsize=FONT_PANEL_TITLE * scale,
+                     fontweight='bold', pad=24)
+        subtitle = f'total {agg_label.lower()}: {fmt_num(group_totals[gv])}'
+        ax.text(0.5, 1.02, subtitle, transform=ax.transAxes,
+                ha='center', va='bottom', fontsize=FONT_BADGE * scale, color='#666')
+
+        ax.tick_params(axis='both', labelsize=FONT_TICK * scale)
+
+        # In shared-order modes every panel shows the same field list, so
+        # hide the y-tick labels on non-leftmost columns to reduce clutter
+        if c > 0 and sort in shared_modes:
+            ax.set_yticklabels([])
+
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.grid(True, axis='x', color='gray', alpha=0.3, linewidth=0.5)
+
+    # Hide unused panels in the trailing row
+    for idx in range(n_groups, n_rows * n_cols):
+        r = idx // max_cols
+        c = idx % max_cols
+        axes[r, c].set_visible(False)
+
+    if suptitle is None:
+        suptitle = (f'{agg_label} of Fields by '
+                    f'{group_field.replace("_", " ").title()}')
+    fig.suptitle(suptitle, fontsize=FONT_SUPTITLE * scale, fontweight='bold')
+
+    # Leave headroom at the top for the suptitle
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()
+
+
+def _draw_scatter_panel(ax, df, x_field, y_field,
+                        color_field=None, color='#888888',
+                        color_map=None, default_color='#888888',
+                        alpha=0.4, point_size=10,
+                        trend=None, correlation=True,
+                        font_scale=1.0):
+    """
+    Draw a single scatter panel on `ax`. Optional per-point coloring by
+    color_field, linear trend line, and Pearson r badge in the corner.
+    Pearson r is computed on the data passed in (post-sampling, post-filter).
+
+    font_scale multiplies all FONT_* constants for fonts drawn in this panel —
+    used by plot_scatter to compensate for its narrower default render width
+    so on-screen fonts match the wider chart helpers in nb2report HTML.
+    """
+    x = df[x_field]
+    y = df[y_field]
+
+    if color_field and color_field in df.columns:
+        unique_vals = df[color_field].dropna().unique()
+        cmap = color_map if color_map is not None else BOROUGH_COLORS
+        for v in unique_vals:
+            mask = df[color_field] == v
+            v_key = v.lower() if isinstance(v, str) else v
+            c = cmap.get(v_key, default_color)
+            ax.scatter(x[mask], y[mask], color=c, alpha=alpha,
+                       s=point_size, edgecolors='none', label=str(v))
+        # Skip legend if too many categories — would dominate the panel
+        if len(unique_vals) <= 12:
+            ax.legend(fontsize=FONT_LEGEND * font_scale, framealpha=0.7, loc='best')
+    else:
+        ax.scatter(x, y, color=color, alpha=alpha,
+                   s=point_size, edgecolors='none')
+
+    # Linear trend line via numpy polyfit (degree 1)
+    valid = ~(x.isna() | y.isna())
+    if trend == 'linear' and valid.sum() >= 2:
+        xv = x[valid].values
+        yv = y[valid].values
+        coef = np.polyfit(xv, yv, 1)
+        line_x = np.array([xv.min(), xv.max()])
+        line_y = np.polyval(coef, line_x)
+        ax.plot(line_x, line_y, color='#333333', linewidth=1.5,
+                linestyle='--', alpha=0.7, zorder=10)
+
+    # Pearson r badge (top-left of panel, white-bg pill)
+    if correlation and valid.sum() >= 2:
+        r = np.corrcoef(x[valid], y[valid])[0, 1]
+        ax.text(0.02, 0.98, f'r = {r:.3f}', transform=ax.transAxes,
+                ha='left', va='top', fontsize=FONT_BADGE * font_scale,
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                          edgecolor='#999', alpha=0.85))
+
+    ax.tick_params(axis='both', labelsize=FONT_TICK * font_scale)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.grid(True, color='gray', alpha=0.3, linewidth=0.5)
+
+
+def plot_scatter(df, x_field, y_field,
+                 group_field=None, color_field=None,
+                 trend=None, correlation=True,
+                 log_x=False, log_y=False,
+                 x_max=None, y_max=None,
+                 x_min=None, y_min=None,
+                 alpha=0.4, point_size=10,
+                 sample=None, sample_seed=42,
+                 max_cols=3, shared_axes=True,
+                 panel_width=4.0, panel_height=4.0,
+                 color='#888888', color_map=None,
+                 default_color='#888888', title=None):
+    """
+    Scatterplot of two numeric measures.
+
+    Single-panel mode (group_field=None): one chart for the whole dataset.
+    Grid mode (group_field='borough'): small multiples, one panel per group
+    value, panels colored via BOROUGH_COLORS by default.
+
+    Parameters
+    ----------
+    df            : DataFrame
+    x_field       : numeric column on the X-axis
+    y_field       : numeric column on the Y-axis
+    group_field   : if given, render one panel per unique value (small multiples).
+                    None = single chart for the whole frame.
+    color_field   : if given, color individual POINTS by this categorical field
+                    (uses BOROUGH_COLORS by default). Independent of group_field —
+                    you can group by month and color by borough, for example.
+    trend         : 'linear' = overlay a least-squares regression line. None = skip.
+    correlation   : if True, show Pearson r in a corner badge
+    log_x, log_y  : log-scale either axis (useful when measures span orders
+                    of magnitude — fares, distances)
+    x_max, y_max  : force upper bound on each axis (zoom past outliers).
+                    None = auto. In grid mode applies to every panel.
+    x_min, y_min  : force lower bound on each axis. None = auto.
+    alpha         : point transparency (default 0.4 — let dense regions show through)
+    point_size    : matplotlib `s` (points²) — default 10
+    sample        : cap rendered points for performance. e.g. sample=10_000
+                    on a 30M-row frame. r is computed on the sampled data.
+    sample_seed   : random seed for the sample (so re-runs are stable)
+    max_cols      : max panels per row in grid mode (default 3)
+    shared_axes   : grid mode — share both X and Y axes across panels so cloud
+                    shapes are directly comparable (default True)
+    panel_width   : width per panel in inches (default 4.0)
+    panel_height  : height per panel in inches (default 4.0)
+    color         : single panel color when neither color_field nor group palette applies
+    color_map     : dict mapping group/color value → color. None = BOROUGH_COLORS.
+    default_color : color for values not found in color_map
+    title         : chart title (default auto: '<Y> vs <X>' or with 'by <Group>')
+    """
+    if color_map is None:
+        color_map = BOROUGH_COLORS
+
+    # Sample BEFORE grouping so grid panels stay proportional
+    if sample and len(df) > sample:
+        df = df.sample(n=sample, random_state=sample_seed)
+
+    # ── Single-panel mode ────────────────────────────────────────────────
+    if group_field is None:
+        fig_w = panel_width * 1.5
+        fig_h = panel_height
+        # Scale fonts down so on-screen size matches wider chart helpers
+        # in nb2report HTML (which displays all images at uniform width)
+        scale = fig_w / CHART_WIDTH
+
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=CHART_DPI)
+        _draw_scatter_panel(ax, df, x_field, y_field,
+                            color_field=color_field, color=color,
+                            color_map=color_map, default_color=default_color,
+                            alpha=alpha, point_size=point_size,
+                            trend=trend, correlation=correlation,
+                            font_scale=scale)
+        if log_x:
+            ax.set_xscale('log')
+        if log_y:
+            ax.set_yscale('log')
+        if x_min is not None or x_max is not None:
+            ax.set_xlim(left=x_min, right=x_max)
+        if y_min is not None or y_max is not None:
+            ax.set_ylim(bottom=y_min, top=y_max)
+        ax.set_xlabel(x_field.replace('_', ' ').title(),
+                      fontsize=FONT_AXIS_LABEL * scale)
+        ax.set_ylabel(y_field.replace('_', ' ').title(),
+                      fontsize=FONT_AXIS_LABEL * scale)
+        ax.set_title(title or
+                     f'{y_field.replace("_", " ").title()} vs '
+                     f'{x_field.replace("_", " ").title()}',
+                     fontsize=FONT_TITLE * scale, fontweight='bold')
+        plt.tight_layout()
+        plt.show()
+        return
+
+    # ── Grid mode ────────────────────────────────────────────────────────
+    # Largest group first (most visually important)
+    groups   = df[group_field].value_counts().index.tolist()
+    n_groups = len(groups)
+    n_cols   = min(n_groups, max_cols)
+    n_rows   = -(-n_groups // max_cols)
+
+    fig_w = panel_width  * n_cols
+    fig_h = panel_height * n_rows
+    # Scale fonts to compensate for narrower-than-CHART_WIDTH renders
+    # so on-screen text matches the wider helpers in nb2report HTML.
+    scale = fig_w / CHART_WIDTH
+
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(fig_w, fig_h), dpi=CHART_DPI,
+                             squeeze=False,
+                             sharex=shared_axes, sharey=shared_axes)
+
+    for idx, gv in enumerate(groups):
+        r = idx // max_cols
+        c = idx % max_cols
+        ax = axes[r, c]
+
+        gv_key = gv.lower() if isinstance(gv, str) else gv
+        panel_color = color_map.get(gv_key, default_color)
+
+        sub = df[df[group_field] == gv]
+        _draw_scatter_panel(ax, sub, x_field, y_field,
+                            color_field=color_field,
+                            color=panel_color,
+                            color_map=color_map,
+                            default_color=default_color,
+                            alpha=alpha, point_size=point_size,
+                            trend=trend, correlation=correlation,
+                            font_scale=scale)
+
+        if log_x:
+            ax.set_xscale('log')
+        if log_y:
+            ax.set_yscale('log')
+        if x_min is not None or x_max is not None:
+            ax.set_xlim(left=x_min, right=x_max)
+        if y_min is not None or y_max is not None:
+            ax.set_ylim(bottom=y_min, top=y_max)
+
+        ax.set_title(str(gv).title() if isinstance(gv, str) else str(gv),
+                     fontsize=FONT_PANEL_TITLE * scale, fontweight='bold', pad=22)
+        ax.text(0.5, 1.02, f'n={fmt_num(len(sub))}',
+                transform=ax.transAxes, ha='center', va='bottom',
+                fontsize=FONT_BADGE * scale, color='#666')
+
+        # Axis labels only on outer edges to reduce clutter
+        if r == n_rows - 1:
+            ax.set_xlabel(x_field.replace('_', ' ').title(),
+                          fontsize=FONT_AXIS_LABEL * scale)
+        else:
+            ax.set_xlabel('')
+        if c == 0:
+            ax.set_ylabel(y_field.replace('_', ' ').title(),
+                          fontsize=FONT_AXIS_LABEL * scale)
+        else:
+            ax.set_ylabel('')
+
+    # Hide unused panels in the trailing row
+    for idx in range(n_groups, n_rows * n_cols):
+        r = idx // max_cols
+        c = idx % max_cols
+        axes[r, c].set_visible(False)
+
+    suptitle = title or (
+        f'{y_field.replace("_", " ").title()} vs '
+        f'{x_field.replace("_", " ").title()} '
+        f'by {group_field.replace("_", " ").title()}'
+    )
+    fig.suptitle(suptitle, fontsize=FONT_SUPTITLE * scale, fontweight='bold')
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
 
