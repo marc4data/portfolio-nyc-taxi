@@ -80,7 +80,7 @@ renamed AS (
         CAST(tip_amount     AS FLOAT)                            AS tip_amount,
         CAST(tolls_amount   AS FLOAT)                            AS tolls_amount,
         CAST(improvement_surcharge  AS FLOAT)                    AS improvement_surcharge,
-        CAST(airport_fee    AS FLOAT)                            AS airport_fee,
+        CAST(coalesce(airport_fee, 0) AS FLOAT)                  AS airport_fee,
         CAST(trip_distance  AS FLOAT)                            AS trip_distance_miles,
         CAST(total_amount   AS FLOAT)                            AS total_amount,
         CAST(passenger_count AS INT)                             AS passenger_count,
@@ -91,22 +91,32 @@ renamed AS (
                     )
         )                                                        AS passenger_count_imputed,
 
-        -- ── Indicator fields (1/0; sum()=count, avg()=rate) ───────────────────
-        CASE WHEN COALESCE(passenger_count, 0) = 0                       THEN 1 ELSE 0 END AS passenger_count_missing_ind,
-        CASE WHEN CAST(fare_amount   AS FLOAT) <= 0                      THEN 1 ELSE 0 END AS negative_fare_ind,
-        CASE WHEN DATEDIFF('minute', pickup_datetime, dropoff_datetime) < 0  THEN 1 ELSE 0 END AS negative_duration_ind,
-        CASE WHEN DATEDIFF('minute', pickup_datetime, dropoff_datetime) > 180 THEN 1 ELSE 0 END AS long_duration_ind,
-        CASE WHEN CAST(trip_distance AS FLOAT) = 0                       THEN 1 ELSE 0 END AS zero_distance_ind,
-        CASE WHEN CAST(pickup_location_id  AS INT) IN (132, 138)         THEN 1 ELSE 0 END AS airport_pickup_ind,
-        CASE WHEN CAST(dropoff_location_id AS INT) IN (132, 138)         THEN 1 ELSE 0 END AS airport_dropoff_ind,
-        CASE WHEN CAST(ratecode_id AS INT) = 2                           THEN 1 ELSE 0 END AS jfk_flat_rate_ind,
-        CASE 
-            WHEN pickup_datetime IS NULL 
-            OR dropoff_datetime IS NULL 
+        -- ── Indicator fields ──────────────────────────────────────────────────────────
+        CASE WHEN passenger_count IS NULL                                  THEN 1 ELSE 0 END AS passenger_count_missing_ind,
+        CASE WHEN COALESCE(passenger_count, 0) = 0
+            OR passenger_count > 8                                         THEN 1 ELSE 0 END AS passenger_count_exception_ind,
+        CASE WHEN fare_amount < 0
+            OR fare_amount > 100                                           THEN 1 ELSE 0 END AS fare_exception_ind,
+        CASE WHEN tip_amount < 0
+            OR tip_amount > 40                                             THEN 1 ELSE 0 END AS tip_amount_exception_ind,
+        CASE WHEN tolls_amount < 0
+            OR tolls_amount > 10                                           THEN 1 ELSE 0 END AS tolls_amount_exception_ind,
+        CASE WHEN extra < 0
+            OR extra > 10                                                  THEN 1 ELSE 0 END AS extra_surcharge_exception_ind,
+        CASE WHEN mta_tax < 0
+            OR mta_tax > 4                                                 THEN 1 ELSE 0 END AS mta_tax_exception_ind,
+        CASE WHEN improvement_surcharge < 0                                  THEN 1 ELSE 0 END AS improvement_surcharge_exception_ind,
+        CASE WHEN COALESCE(trip_distance, 0) <= 0
+            OR trip_distance > 30                                          THEN 1 ELSE 0 END AS trip_distance_miles_exception_ind,
+        CASE WHEN DATEDIFF('minute', pickup_datetime, dropoff_datetime) <= 0
+            OR DATEDIFF('minute', pickup_datetime, dropoff_datetime) > 180 THEN 1 ELSE 0 END AS trip_duration_exception_ind,
+        CASE WHEN pickup_location_id IN (132, 138)                           THEN 1 ELSE 0 END AS airport_pickup_ind,
+        CASE WHEN dropoff_location_id IN (132, 138)                          THEN 1 ELSE 0 END AS airport_dropoff_ind,
+        CASE WHEN ratecode_id = 2                                            THEN 1 ELSE 0 END AS jfk_flat_rate_ind,
+        CASE WHEN pickup_datetime IS NULL
+            OR dropoff_datetime IS NULL
             OR fare_amount IS NULL
-            OR pickup_location_id IS NULL
-            THEN 1 ELSE 0 
-        END                                                                                 AS is_null_batch_ind,        
+            OR pickup_location_id IS NULL                                  THEN 1 ELSE 0 END AS is_null_batch_ind,    
 
 
         -- ── Decoded labels ────────────────────────────────────────────────────

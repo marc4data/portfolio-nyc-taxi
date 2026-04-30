@@ -75,6 +75,22 @@ final AS (
         e.airport_fee,
         e.total_amount,
 
+        -- Quality indicators (all 1/0)
+        e.airport_pickup_ind,
+        e.airport_dropoff_ind,
+        e.extra_surcharge_exception_ind,
+        e.fare_exception_ind,
+        e.improvement_surcharge_exception_ind,  
+        e.is_null_batch_ind,
+        e.jfk_flat_rate_ind,
+        e.mta_tax_exception_ind,   
+        e.passenger_count_exception_ind,
+        e.passenger_count_missing_ind,
+        e.tip_amount_exception_ind,      
+        e.tolls_amount_exception_ind,
+        e.trip_distance_miles_exception_ind,
+        e.trip_duration_exception_ind,
+
         -- Weather (LEFT JOIN — NULL if weather data missing for that date)
         w.temp_max_f            AS weather_temp_max_f,
         w.temp_min_f            AS weather_temp_min_f,
@@ -86,18 +102,7 @@ final AS (
         w.rain_day_ind          AS weather_rain_day_ind,
         w.snow_day_ind          AS weather_snow_day_ind,
         w.freezing_day_ind      AS weather_freezing_day_ind,
-
-        -- Quality indicators (all 1/0)
-        e.passenger_count_missing_ind,
-        e.negative_fare_ind,
-        e.negative_duration_ind,
-        e.long_duration_ind,
-        e.zero_distance_ind,
-        e.airport_pickup_ind,
-        e.airport_dropoff_ind,
-        e.jfk_flat_rate_ind,
-        e.is_null_batch_ind
-
+        
     FROM enriched e
     LEFT JOIN weather w ON e.pickup_date = w.date
 

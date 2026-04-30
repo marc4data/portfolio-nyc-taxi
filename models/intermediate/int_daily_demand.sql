@@ -16,28 +16,29 @@ aggregated AS (
         pickup_location_id,
         pickup_borough,
         pickup_zone,
+        pickup_service_zone,                        -- added: needed in fct_daily_demand for zone-type filtering
 
         -- Volume
         COUNT(*)                                AS trip_count,
         SUM(airport_pickup_ind)                 AS airport_pickup_count,
         SUM(is_null_batch_ind)                  AS null_batch_trip_count,
-        SUM(negative_fare_ind)                  AS negative_fare_count,
-        SUM(zero_distance_ind)                  AS zero_distance_count,
+        SUM(fare_exception_ind)                 AS fare_exception_count,
+        SUM(trip_distance_miles_exception_ind)  AS zero_distance_count,
         SUM(cross_borough_ind)                  AS cross_borough_count,
 
         -- Revenue (exclude negative fares from revenue metrics)
-        SUM(CASE WHEN negative_fare_ind = 0 THEN fare_amount  ELSE 0 END) AS total_fare_revenue,
-        SUM(CASE WHEN negative_fare_ind = 0 THEN total_amount ELSE 0 END) AS total_revenue,
-        SUM(CASE WHEN negative_fare_ind = 0 THEN tip_amount   ELSE 0 END) AS total_tips,
+        SUM(CASE WHEN fare_exception_ind = 1 THEN fare_amount  ELSE 0 END) AS total_fare_revenue,
+        SUM(CASE WHEN fare_exception_ind = 1 THEN total_amount ELSE 0 END) AS total_revenue,
+        SUM(CASE WHEN fare_exception_ind = 1 THEN tip_amount   ELSE 0 END) AS total_tips,
 
         -- Averages (exclude null_batch and negative fares for cleaner metrics)
-        AVG(CASE WHEN is_null_batch_ind = 0 AND negative_fare_ind = 0
+        AVG(CASE WHEN is_null_batch_ind = 0 AND fare_exception_ind = 0
                  THEN fare_amount END)           AS avg_fare,
         AVG(CASE WHEN is_null_batch_ind = 0
                  THEN trip_distance_miles END)   AS avg_distance_miles,
         AVG(CASE WHEN is_null_batch_ind = 0
                  THEN trip_duration_minutes END) AS avg_duration_minutes,
-        AVG(CASE WHEN is_null_batch_ind = 0 AND negative_fare_ind = 0
+        AVG(CASE WHEN is_null_batch_ind = 0 AND fare_exception_ind = 0
                  THEN tip_amount END)            AS avg_tip,
 
         -- Tip rate (credit card trips only — cash tips not captured)
@@ -61,7 +62,8 @@ aggregated AS (
         pickup_date,
         pickup_location_id,
         pickup_borough,
-        pickup_zone
+        pickup_zone,
+        pickup_service_zone                         -- added: matches SELECT addition above
 
 )
 

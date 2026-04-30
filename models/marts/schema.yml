@@ -18,27 +18,39 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_zones')
-              field: location_id
+              arguments: 
+                to: ref('dim_zones')
+                field: location_id
       - name: dropoff_location_id
         tests:
           - relationships:
-              to: ref('dim_zones')
-              field: location_id
+              arguments: 
+                to: ref('dim_zones')
+                field: location_id
       - name: fare_amount
         tests: [not_null]
       - name: total_amount
         tests: [not_null]
       - name: is_null_batch_ind
-        tests: [{accepted_values: {values: [0, 1]}}]
-      - name: negative_fare_ind
-        tests: [{accepted_values: {values: [0, 1]}}]
+        tests: 
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: fare_exception_ind
+        tests: 
+          - accepted_values:
+              arguments:
+                values: [0, 1]
       - name: airport_pickup_ind
-        tests: [{accepted_values: {values: [0, 1]}}]
+        tests: 
+          - accepted_values:
+              arguments:
+                values: [0, 1]
       - name: payment_type_label
         tests:
           - accepted_values:
-              values: ['credit_card', 'cash', 'no_charge', 'dispute', 'unknown']
+              arguments:
+                values: ['credit_card', 'cash', 'no_charge', 'dispute', 'unknown']
 
   - name: fct_daily_demand
     description: >
@@ -55,6 +67,35 @@ models:
         tests: [not_null]
       - name: trip_count
         tests: [not_null]
+      - name: adjusted_trip_count
+        description: trip_count minus null_batch_trip_count. Model-ready demand target.
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+      - name: has_null_batch_ind
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: null_batch_pct
+      - name: day_of_week
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6]
+      - name: is_weekend
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: pickup_service_zone
+        tests:
+          - not_null         # flag if any zones are missing from the lookup
 
   - name: dim_zones
     description: 'TLC taxi zone lookup. 265 rows. Loaded from dbt seed taxi_zone_lookup.csv.'
@@ -65,14 +106,16 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr', 'n/a', 'unknown']
+              arguments:
+                values: ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten island', 'ewr', 'n/a', 'unknown']
       - name: is_airport_zone
-        tests: [{accepted_values: {values: [0, 1]}}]
+        tests: 
+          - accepted_values:
+              arguments:
+                values: [0, 1]
 
   - name: dim_date
-    description: >
-      Date spine from 2019-01-01 to 2025-12-31. One row per calendar date.
-      Includes COVID period flags for Phase 2 year-over-year analysis.
+    description: 'Date spine from 2019-01-01 to 2025-12-31. One row per calendar date. Includes COVID period flags for Phase 2 year-over-year analysis.'
     columns:
       - name: date
         tests: [not_null, unique]
