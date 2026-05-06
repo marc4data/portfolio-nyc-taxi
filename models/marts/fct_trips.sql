@@ -26,7 +26,7 @@ weather AS (
     SELECT * FROM {{ ref('stg_weather') }}
 ),
 
-final AS (
+prep AS (
 
     SELECT
         -- Keys
@@ -84,12 +84,20 @@ final AS (
         e.is_null_batch_ind,
         e.jfk_flat_rate_ind,
         e.mta_tax_exception_ind,   
-        e.passenger_count_exception_ind,
         e.passenger_count_missing_ind,
         e.tip_amount_exception_ind,      
         e.tolls_amount_exception_ind,
         e.trip_distance_miles_exception_ind,
         e.trip_duration_exception_ind,
+        case
+            when e.fare_exception_ind                       = 0
+                and e.trip_duration_exception_ind           = 0 
+                and e.trip_distance_miles_exception_ind     = 0
+                and e.is_null_batch_ind                     = 0
+            then 1
+            else 0
+        end                                                 as is_valid_trip,
+
 
         -- Weather (LEFT JOIN — NULL if weather data missing for that date)
         w.temp_max_f            AS weather_temp_max_f,
@@ -106,6 +114,14 @@ final AS (
     FROM enriched e
     LEFT JOIN weather w ON e.pickup_date = w.date
 
+),
+
+final AS (
+
+    SELECT * 
+    FROM prep p
+    WHERE p.is_valid_trip = 1
 )
+
 
 SELECT * FROM final

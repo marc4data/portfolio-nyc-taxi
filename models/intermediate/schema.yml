@@ -32,3 +32,18 @@ models:
         tests: [not_null]
       - name: trip_count
         tests: [not_null]
+
+  - name: int_hourly_demand
+    description: >
+      Trip-level data aggregated to zone+hour grain. One row per pickup_location_id
+      per hour-truncated pickup_datetime. Lean by design — only volume columns
+      (trip_count, airport_pickup_count). Used as input for fct_hourly_demand,
+      which is the primary input for the ML demand prediction model.
+    columns:
+      - name: pickup_hour_ts
+        description: 'pickup_datetime truncated to the hour (canonical hourly key)'
+        tests: [not_null]
+      - name: pickup_location_id
+        tests: [not_null]
+      - name: trip_count
+        tests: [not_null]

@@ -13,6 +13,7 @@ aggregated AS (
 
     SELECT
         pickup_date,
+        pickup_hour,
         pickup_location_id,
         pickup_borough,
         pickup_zone,
@@ -60,6 +61,7 @@ aggregated AS (
     FROM enriched
     GROUP BY
         pickup_date,
+        pickup_hour,
         pickup_location_id,
         pickup_borough,
         pickup_zone,

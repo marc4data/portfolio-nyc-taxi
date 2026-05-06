@@ -27,6 +27,13 @@ models:
         tests: [not_null]
       - name: dropoff_location_id
         tests: [not_null]
+      - name: passenger_count
+        description: 'NULL = 0-passenger records coerced to NULL at staging. Valid range 1–6.'
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 6
+              inclusive: true        
       - name: fare_amount
         tests: [not_null]
       - name: total_amount
@@ -77,12 +84,18 @@ models:
         tests:
           - accepted_values: 
               arguments:
-                values: [0, 1, 2, 3, 4, 5]
+                values: [1, 2, 3, 4, 5]
       - name: payment_type_label
         tests:
           - accepted_values:
               arguments:
                 values: ['credit_card', 'cash', 'no_charge', 'dispute', 'unknown']
+      - name: rate_code_id
+        description: 'NULL = unknown/sentinel (99 coerced to NULL at staging)'
+        tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6]
 
   - name: stg_taxi_zones
     description: '265 NYC taxi zones from the TLC zone lookup seed.'
