@@ -62,12 +62,12 @@ renamed AS (
         vendor_id,
 
         -- rate_code stored as STRING float ('1.0', '2.0') — cast to INT
-        CAST(ratecode_id AS INT)                                     AS rate_code_id,
+        NULLIF(CAST(ratecode_id AS INT), 99)                         AS rate_code_id,
 
         LOWER(store_and_fwd_flag)                                    AS store_and_fwd_flag,
 
         -- payment_type stored as STRING ('1', '2') — cast to INT
-        CAST(payment_type AS INT)                                AS payment_type,
+        NULLIF(CAST(payment_type AS INT), 0)                         AS payment_type,
 
         -- ── Location IDs (STRING in source → INT for zone lookup join) ────────
         CAST(pickup_location_id  AS INT)                         AS pickup_location_id,
@@ -83,18 +83,13 @@ renamed AS (
         CAST(coalesce(airport_fee, 0) AS FLOAT)                  AS airport_fee,
         CAST(trip_distance  AS FLOAT)                            AS trip_distance_miles,
         CAST(total_amount   AS FLOAT)                            AS total_amount,
-        CAST(passenger_count AS INT)                             AS passenger_count,
-        COALESCE(   passenger_count,
-                    FIRST_VALUE(passenger_count) OVER (
-                        PARTITION BY vendor_id 
-                        ORDER BY CASE WHEN passenger_count IS NOT NULL THEN 0 ELSE 1 END
-                    )
-        )                                                        AS passenger_count_imputed,
+        CASE
+            WHEN CAST(passenger_count AS INT) BETWEEN 1 AND 6 THEN CAST(passenger_count AS INT)
+            ELSE NULL
+        END                                                      AS passenger_count,        
 
         -- ── Indicator fields ──────────────────────────────────────────────────────────
         CASE WHEN passenger_count IS NULL                                  THEN 1 ELSE 0 END AS passenger_count_missing_ind,
-        CASE WHEN COALESCE(passenger_count, 0) = 0
-            OR passenger_count > 8                                         THEN 1 ELSE 0 END AS passenger_count_exception_ind,
         CASE WHEN fare_amount < 0
             OR fare_amount > 100                                           THEN 1 ELSE 0 END AS fare_exception_ind,
         CASE WHEN tip_amount < 0
@@ -104,20 +99,19 @@ renamed AS (
         CASE WHEN extra < 0
             OR extra > 10                                                  THEN 1 ELSE 0 END AS extra_surcharge_exception_ind,
         CASE WHEN mta_tax < 0
-            OR mta_tax > 4                                                 THEN 1 ELSE 0 END AS mta_tax_exception_ind,
-        CASE WHEN improvement_surcharge < 0                                  THEN 1 ELSE 0 END AS improvement_surcharge_exception_ind,
+            OR mta_tax > 4                                                 THEN 1 ELSE 0 END    AS mta_tax_exception_ind,
+        CASE WHEN improvement_surcharge < 0                                  THEN 1 ELSE 0 END  AS improvement_surcharge_exception_ind,
         CASE WHEN COALESCE(trip_distance, 0) <= 0
-            OR trip_distance > 30                                          THEN 1 ELSE 0 END AS trip_distance_miles_exception_ind,
+            OR trip_distance > 30                                          THEN 1 ELSE 0 END    AS trip_distance_miles_exception_ind,
         CASE WHEN DATEDIFF('minute', pickup_datetime, dropoff_datetime) <= 0
-            OR DATEDIFF('minute', pickup_datetime, dropoff_datetime) > 180 THEN 1 ELSE 0 END AS trip_duration_exception_ind,
-        CASE WHEN pickup_location_id IN (132, 138)                           THEN 1 ELSE 0 END AS airport_pickup_ind,
-        CASE WHEN dropoff_location_id IN (132, 138)                          THEN 1 ELSE 0 END AS airport_dropoff_ind,
-        CASE WHEN ratecode_id = 2                                            THEN 1 ELSE 0 END AS jfk_flat_rate_ind,
+            OR DATEDIFF('minute', pickup_datetime, dropoff_datetime) > 180 THEN 1 ELSE 0 END    AS trip_duration_exception_ind,
+        CASE WHEN pickup_location_id IN (132, 138)                           THEN 1 ELSE 0 END  AS airport_pickup_ind,
+        CASE WHEN dropoff_location_id IN (132, 138)                          THEN 1 ELSE 0 END  AS airport_dropoff_ind,
+        CASE WHEN ratecode_id = 2                                            THEN 1 ELSE 0 END  AS jfk_flat_rate_ind,
         CASE WHEN pickup_datetime IS NULL
             OR dropoff_datetime IS NULL
             OR fare_amount IS NULL
-            OR pickup_location_id IS NULL                                  THEN 1 ELSE 0 END AS is_null_batch_ind,    
-
+            OR pickup_location_id IS NULL                                  THEN 1 ELSE 0 END    AS is_null_batch_ind,    
 
         -- ── Decoded labels ────────────────────────────────────────────────────
         CASE CAST(payment_type AS INT)
@@ -126,7 +120,7 @@ renamed AS (
             WHEN 3 THEN 'no_charge'
             WHEN 4 THEN 'dispute'
             ELSE        'unknown'
-        END                                                                   AS payment_type_label,
+        END                                                                                     AS payment_type_label,
 
         CASE CAST(ratecode_id AS INT)
             WHEN 1  THEN 'standard'
@@ -136,7 +130,7 @@ renamed AS (
             WHEN 5  THEN 'negotiated'
             WHEN 99 THEN 'unknown'
             ELSE        'other'
-        END                                                                   AS rate_code_label,
+        END                                                                                     AS rate_code_label,
 
         -- ── Partition helpers (carry through for incremental filter) ──────────
         data_file_year,
