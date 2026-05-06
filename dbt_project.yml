@@ -12,8 +12,8 @@ analysis-paths: ["analyses"]
 vars:
   taxi_load_year: 2024          # Phase 1: 2024 and 2025 
   taxi_load_month: null         # null = all months for full-year load
-  weather_start_date: '2021-01-01'
-  weather_end_date:   '2022-12-31'
+  weather_start_date: '2024-01-01'
+  weather_end_date:   '2025-12-31'
 
 tests:
   +store_failures: false
@@ -41,4 +41,6 @@ models:
       fct_trips:
         +materialized: incremental
       fct_daily_demand:
+        +materialized: incremental
+      fct_hourly_demand:
         +materialized: incremental
