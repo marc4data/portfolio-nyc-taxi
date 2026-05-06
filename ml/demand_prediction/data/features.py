@@ -119,11 +119,23 @@ def add_lag_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values(['pickup_location_id', 'pickup_hour_ts']).copy()
     g  = df.groupby('pickup_location_id')['trip_count']
 
+    # Same-hour lags relative to the row time T
     df['lag_1h']   = g.shift(1)
     df['lag_2h']   = g.shift(2)
     df['lag_24h']  = g.shift(24)
     df['lag_48h']  = g.shift(48)
     df['lag_168h'] = g.shift(168)
+
+    # Target-aligned weekly lags. For predicting trip_count[T + HORIZON_HOURS],
+    # the strongest seasonal signal is at the same hour-of-day and same DoW
+    # 1/2/3/4 weeks before the TARGET time, not before T. Expressed as shifts
+    # from row time T: shift(168·k − HORIZON_HOURS) for k=1..4. With H=24 these
+    # are 144, 312, 480, 648.
+    H = config.HORIZON_HOURS
+    df['lag_t24_1w'] = g.shift(168 * 1 - H)  # 144
+    df['lag_t24_2w'] = g.shift(168 * 2 - H)  # 312
+    df['lag_t24_3w'] = g.shift(168 * 3 - H)  # 480
+    df['lag_t24_4w'] = g.shift(168 * 4 - H)  # 648
 
     df['rolling_mean_7d'] = g.transform(
         lambda x: x.shift(1).rolling(168).mean()
@@ -212,6 +224,7 @@ def build_feature_matrix(df: pd.DataFrame, train_end_date: str) -> pd.DataFrame:
     # 24h of each zone's series, plus any zones that never reached the
     # 168-row warm-up window
     required = ['lag_1h', 'lag_2h', 'lag_24h', 'lag_48h', 'lag_168h',
+                'lag_t24_1w', 'lag_t24_2w', 'lag_t24_3w', 'lag_t24_4w',
                 'rolling_mean_7d', 'rolling_std_7d', 'target',
                 'zone_trip_volume_rank']
     df = df.dropna(subset=required).reset_index(drop=True)
