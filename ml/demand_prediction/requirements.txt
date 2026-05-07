@@ -21,3 +21,7 @@ pandera                           # schema checks at the output of features.py
 matplotlib
 seaborn
 jupyter
+
+# ── AI / LLM integration ───────────────────────────────────────────────────
+anthropic                         # Claude API client (briefing.py)
+python-dotenv                     # load ANTHROPIC_API_KEY from .env
