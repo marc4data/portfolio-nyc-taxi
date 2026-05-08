@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NYC TLC Yellow Taxi — Analytics Portfolio</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      border-bottom: 1px solid #21262d;
+      padding: 24px 48px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header svg { flex-shrink: 0; }
+    header .wordmark { font-size: 15px; color: #7d8590; }
+    header .wordmark strong { color: #e6edf3; }
+
+    main {
+      flex: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 64px 48px;
+      width: 100%;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #58a6ff;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      color: #f0f6fc;
+    }
+
+    .tagline {
+      font-size: 17px;
+      color: #8b949e;
+      line-height: 1.6;
+      margin-bottom: 48px;
+      max-width: 640px;
+    }
+
+    .stat-row {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      margin-bottom: 56px;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #58a6ff;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-label {
+      font-size: 13px;
+      color: #7d8590;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #7d8590;
+      margin-bottom: 16px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 56px;
+    }
+    @media (max-width: 600px) { .card-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      padding: 24px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color .15s, background .15s;
+    }
+    .card:hover {
+      border-color: #58a6ff;
+      background: #1c2230;
+    }
+    .card-icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f0f6fc;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: #7d8590;
+      line-height: 1.55;
+    }
+    .card-link {
+      font-size: 13px;
+      color: #58a6ff;
+      margin-top: auto;
+      padding-top: 4px;
+    }
+
+    .stack-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 56px;
+    }
+    .badge {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+
+    .github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e6edf3;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+    .github-link:hover { background: #292e36; border-color: #58a6ff; }
+
+    footer {
+      border-top: 1px solid #21262d;
+      padding: 24px 48px;
+      font-size: 13px;
+      color: #7d8590;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    footer a { color: #58a6ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="#7d8590"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
+  <span class="wordmark"><strong>marc4data</strong> / portfolio-nyc-taxi</span>
+</header>
+
+<main>
+  <p class="eyebrow">Portfolio Project</p>
+  <h1>NYC TLC Yellow Taxi<br>Analytics &amp; ML</h1>
+  <p class="tagline">Full-stack analytics on 80M trips across two years — warehouse modeling in Snowflake + dbt, hourly demand forecasting with LightGBM, and LLM-authored stakeholder briefings via the Claude API.</p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <span class="stat-value">13.6%</span>
+      <span class="stat-label">MAE lift over 4-week-DoW baseline</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">1.4M</span>
+      <span class="stat-label">held-out test rows (Apr–Dec 2025)</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">80M</span>
+      <span class="stat-label">trips, 265 zones, 2 years</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">~90%</span>
+      <span class="stat-label">token cost reduction via prompt caching</span>
+    </div>
+  </div>
+
+  <p class="section-label">Live Outputs</p>
+  <div class="card-grid">
+    <a class="card" href="dbprofile_report.html">
+      <span class="card-icon">🔬</span>
+      <span class="card-title">Data Quality Report</span>
+      <span class="card-desc">Interactive HTML report from <strong>dbprofile</strong> — 9 automated checks across all marts including null density, uniqueness, temporal consistency, and format validation.</span>
+      <span class="card-link">View report →</span>
+    </a>
+    <a class="card" href="eda_fct_trips.html">
+      <span class="card-icon">📊</span>
+      <span class="card-title">EDA — Trip-Level Analysis</span>
+      <span class="card-desc">Stakeholder-ready report rendered by <strong>nb2report</strong> — code stripped, charts embedded inline, narrative prose from the Jupyter EDA notebook.</span>
+      <span class="card-link">View report →</span>
+    </a>
+  </div>
+
+  <p class="section-label">Stack</p>
+  <div class="stack-list">
+    <span class="badge">Snowflake</span>
+    <span class="badge">dbt</span>
+    <span class="badge">LightGBM</span>
+    <span class="badge">Optuna</span>
+    <span class="badge">SHAP</span>
+    <span class="badge">Claude API</span>
+    <span class="badge">Python</span>
+    <span class="badge">Jupyter</span>
+    <span class="badge">NOAA weather data</span>
+    <span class="badge">NYC TLC parquet</span>
+  </div>
+
+  <a class="github-link" href="https://github.com/marc4data/portfolio-nyc-taxi">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
+    View full repo on GitHub
+  </a>
+</main>
+
+<footer>
+  <span>Marc Alexander · Analytics Engineering Portfolio · 2026</span>
+  <span>
+    <a href="https://github.com/marc4data/dbprofile">dbprofile</a> ·
+    <a href="https://github.com/marc4data/nb2report-analytics">nb2report</a> ·
+    <a href="https://www.linkedin.com/in/marc4data/">LinkedIn</a>
+  </span>
+</footer>
+
+</body>
+</html>

@@ -19,6 +19,9 @@ venv/
 
 # Notebook / HTML exports
 *.html
+# ...except GitHub Pages demo outputs
+!docs/
+!docs/*.html
 
 # Excel temp files
 ~$*
