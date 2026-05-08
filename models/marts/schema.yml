@@ -158,3 +158,33 @@ models:
     columns:
       - name: date
         tests: [not_null, unique]
+
+  - name: fct_hourly_demand
+    description: >
+      Aggregated fact: one row per zone per hour. Primary input for the
+      ML demand prediction model (LightGBM, t+24 horizon, ml/demand_prediction/).
+      Grain: demand_id = MD5(pickup_location_id | pickup_hour_ts).
+      Weather columns join from stg_weather on pickup_date (daily-grain weather
+      duplicated across the 24 hourly slices of each date).
+      Calendar columns join from dim_date on pickup_date.
+    columns:
+      - name: demand_id
+        description: 'Surrogate PK'
+        tests: [not_null, unique]
+      - name: pickup_hour_ts
+        description: 'pickup_datetime truncated to the hour'
+        tests: [not_null]
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+      - name: trip_count
+        tests: [not_null]
+      - name: is_airport
+        tests: [{accepted_values: {values: [0, 1]}}]
+      - name: is_weekend
+        tests: [{accepted_values: {values: [0, 1]}}]
+      - name: is_holiday
+        tests: [{accepted_values: {values: [0, 1]}}]

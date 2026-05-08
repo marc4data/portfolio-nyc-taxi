@@ -1,0 +1,27 @@
+# ── Core data + Snowflake ──────────────────────────────────────────────────
+snowflake-connector-python[pandas]>=3.0
+pandas>=2.0
+numpy
+pyyaml
+cryptography
+pyarrow                          # parquet caching of extracted data
+
+# ── ML stack ───────────────────────────────────────────────────────────────
+lightgbm                          # primary model
+xgboost                           # stretch-goal comparison model
+optuna                            # hyperparameter tuning
+shap                              # interpretability
+scikit-learn                      # metrics + utilities
+joblib                            # model serialization
+
+# ── Data validation ────────────────────────────────────────────────────────
+pandera                           # schema checks at the output of features.py
+
+# ── Plotting + notebooks ───────────────────────────────────────────────────
+matplotlib
+seaborn
+jupyter
+
+# ── AI / LLM integration ───────────────────────────────────────────────────
+anthropic                         # Claude API client (briefing.py)
+python-dotenv                     # load ANTHROPIC_API_KEY from .env

@@ -42,3 +42,5 @@ models:
         +materialized: incremental
       fct_daily_demand:
         +materialized: incremental
+      fct_hourly_demand:
+        +materialized: incremental

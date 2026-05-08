@@ -1,0 +1,9 @@
+pandas
+numpy
+matplotlib
+requests
+snowflake-connector-python[pandas]
+pyyaml
+cryptography
+jupyter
+requests

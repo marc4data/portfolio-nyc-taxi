@@ -1,0 +1,16 @@
+# portfolio_nyc_tlc — Snowflake connection config
+# Same format as dbprofile's config_snowflake.yaml.
+# Credentials are loaded from environment variables — never hardcode them here.
+# Copy .env.example to .env and fill in the SNOWFLAKE_* values.
+
+connection:
+  dialect: snowflake
+  account: "${SNOWFLAKE_ACCOUNT}"
+  user: "${SNOWFLAKE_USER}"
+  private_key_path: "${SNOWFLAKE_PRIVATE_KEY_PATH}"   # preferred: key-pair auth
+  # password: "${SNOWFLAKE_PASSWORD}"                 # fallback: uncomment if using password auth
+  warehouse: "${SNOWFLAKE_WAREHOUSE}"
+  role: "${SNOWFLAKE_ROLE}"
+
+scope:
+  database: TAXI_PORTFOLIO
