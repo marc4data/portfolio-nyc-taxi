@@ -8,7 +8,7 @@ A full-stack analytics project on NYC Taxi & Limousine Commission Yellow Taxi da
 |---|---|---|
 | **Data warehouse** | Snowflake + dbt (staging → intermediate → marts) | 5 marts incl. `fct_hourly_demand` for ML, with schema tests + relationship checks |
 | **EDA toolkit** | Reusable Python helpers (`notebooks/eda_helpers.py`) + Jupyter notebooks | 40+ chart functions covering distributions, time series, small-multiples, scatter w/ SHAP-style annotations |
-| **Demand prediction** | LightGBM + Optuna + SHAP | **6.4% MAE lift over a strong 4-week-DoW baseline** for 24-hour-ahead zone-level forecasts |
+| **Demand prediction** | LightGBM + Optuna + SHAP | **13.6% MAE lift over a strong 4-week-DoW baseline** on a held-out 9-month test set (Apr–Dec 2025, 1.4M zone-hours) for 24-hour-ahead forecasts |
 | **LLM integration** | Anthropic Claude API (Sonnet 4.6) + prompt caching | Auto-generates a 700-word executive briefing from model artifacts; ~90% input-token cost reduction on re-runs via prompt cache |
 
 ## Tech Stack
@@ -83,9 +83,19 @@ Lives in [`ml/demand_prediction/`](ml/demand_prediction/). Predicts `trip_count`
 | Train | `predictors/train.py` | LightGBM with early stopping; baseline computed on full feature matrix before split for apples-to-apples lift |
 | Tune | `predictors/tune.py` | Optuna 30-trial search over 7 hyperparameters on a 3-month subset; final model retrained on full year |
 | Explain | `predictors/explain.py` | TreeSHAP on 50K validation rows; saves global importance bar, beeswarm summary, and dependence plots |
-| Evaluate | `predictors/evaluate.py` | MAE / RMSE / MAPE primitives + breakdowns by borough and time-of-day |
+| Test | `predictors/test.py` | Final held-out evaluation on Apr–Dec 2025 (1.4M rows) — the portfolio claim number |
+| Evaluate | `predictors/evaluate.py` | MAE / RMSE / MAPE primitives + breakdowns by borough, time-of-day, and month |
 
-**Headline result:** val MAE **5.03 → 4.98** (model vs. tuned), baseline **5.31**, lift **6.4%**. Best feature by SHAP: `lag_t24_1w` (mean |SHAP| = 13.98) — the original `lag_168h` ranked 7th at 0.58, **24× less important**, after a mid-project realignment of the weekly lags to the target time. SHAP plots in `artifacts/plots/`.
+**Headline results:**
+
+| Split | Period | Rows | Model MAE | Baseline MAE | Lift |
+|---|---|---|---|---|---|
+| Validation (during tuning) | Jan–Mar 2025 | 466K | 4.98 | 5.31 | **6.4%** |
+| **Test (held-out — final)** | **Apr–Dec 2025** | **1.43M** | **4.97** | **5.75** | **13.6%** |
+
+Test lift exceeds val lift because the held-out window covers full seasonality (summer regularity, fall back-to-school, holiday volatility) — the naive baseline's "average 4 prior weeks" framework breaks down on these seasonal shifts more than the model's lag + weather features do. Manhattan MAPE drops from 38% (val) to 32% (test) — the highest-volume zones are where the model adds the most value.
+
+Best feature by SHAP: `lag_t24_1w` (mean |SHAP| = 13.98) — the original `lag_168h` ranked 7th at 0.58, **24× less important**, after a mid-project realignment of the weekly lags to the target time. SHAP plots in `artifacts/plots/`.
 
 Two notebooks frame the work:
 - [`ml/demand_prediction/notebooks/01_eda.ipynb`](ml/demand_prediction/notebooks/01_eda.ipynb) — demand patterns by hour, day, borough, weather; sparsity discussion
@@ -114,6 +124,12 @@ portfolio_nyc_tlc/
 ├── packages.yml
 ├── .env.example                       ← Snowflake config; Anthropic key lives in ~/.anthropic/.env
 ├── .gitignore
+├── infra/                             ← one-time Snowflake provisioning
+│   └── snowflake/
+│       ├── README.md                  ← run order, prerequisites, verification queries
+│       ├── 01_db_and_schema.sql
+│       ├── 02_roles.sql
+│       └── 03_load_data.sql
 ├── models/                            ← dbt
 │   ├── staging/
 │   ├── intermediate/
@@ -144,7 +160,8 @@ portfolio_nyc_tlc/
     │   ├── train.py                   ← LightGBM
     │   ├── tune.py                    ← Optuna
     │   ├── evaluate.py                ← MAE/RMSE/MAPE breakdowns
-    │   └── explain.py                 ← SHAP
+    │   ├── explain.py                 ← SHAP
+    │   └── test.py                    ← held-out test evaluation
     ├── ai/
     │   ├── prompts.py
     │   └── briefing.py                ← Claude API
@@ -174,6 +191,12 @@ cd portfolio-nyc-taxi
 # Python deps for the ML pipeline (and EDA helpers)
 pip install -r ml/demand_prediction/requirements.txt
 ```
+
+### 1b. Provision Snowflake (one-time, only on a clean account)
+
+Run the SQL scripts in [`infra/snowflake/`](infra/snowflake/) against your account — they create the `TAXI_PORTFOLIO` and `ANALYTICS` databases, the `TRANSFORMER` and `LOADER` roles, raw tables, and the parquet load pipeline. See [`infra/snowflake/README.md`](infra/snowflake/README.md) for run order, prerequisites, and verification queries.
+
+If you're working against an existing account that already has these objects, skip this step.
 
 ### 2. Credentials — never inside the project tree
 
@@ -218,16 +241,19 @@ dbt test                            # schema tests
 cd ml/demand_prediction
 python predictors/train.py          # LightGBM with fixed hyperparams (~5 min)
 python predictors/tune.py           # Optuna 30 trials (~1 hour)
+python predictors/test.py           # held-out test set evaluation (~5 min)
 python predictors/explain.py        # SHAP plots (~3 min)
 python ai/briefing.py               # LLM executive briefing (~10 sec)
 ```
 
 Outputs in `ml/demand_prediction/artifacts/`:
-- `metrics.json` — final tuned-model metrics, broken out by overall / borough / time-of-day
+- `metrics.json` — tuned-model metrics on validation set, broken out by overall / borough / time-of-day
+- `test_metrics.json` — tuned-model metrics on the held-out test set (Apr–Dec 2025), with an additional by-month breakdown
+- `predictions_test.parquet` — per-row test predictions (model + baseline) for downstream dashboarding
 - `models/lgbm_tuned.pkl`, `models/best_params.json`, `models/optuna_study.pkl`
 - `plots/shap_global_importance.png`, `plots/shap_summary_beeswarm.png`, `plots/shap_dependence_*.png`
 - `plots/shap_importance.csv` — full feature-importance ranking
-- `executive_briefing.md` — 700-word stakeholder briefing
+- `executive_briefing.md` — 700-word LLM-authored stakeholder briefing
 
 ### 5. Open the narrative notebooks
 
