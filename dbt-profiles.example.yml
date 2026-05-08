@@ -1,0 +1,12 @@
+nyc_taxi:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: <your-account-id>
+      user: <your-username>
+      private_key_path: <path-to-rsa_key.p8>
+      database: ANALYTICS
+      warehouse: TRANSFORMING
+      schema: dbt_<your-username>
+      threads: 4

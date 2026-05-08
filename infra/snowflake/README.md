@@ -51,28 +51,44 @@ These scripts are written for the author's account. Three values you'll likely c
 
 ## Loading the data — the manual step in between
 
-Steps 2 and 4 leave you with empty raw tables and an empty internal stage. To load actual data, between scripts `01` and `03`:
+Steps 2 and 4 leave you with empty raw tables and an empty internal stage. Two ways to populate them:
+
+### Option 1 — Use the Python loaders in this folder (recommended)
+
+| Script | What it does |
+|---|---|
+| `snowflake_conn.py` | Shared connector — reads `config_snowflake.yaml`, returns a `SnowflakeConnector`. Imported by the other loaders. |
+| `load_tlc_to_stage.py` | Walks a local directory for `yellow_tripdata_YYYY-MM.parquet` files and `PUT`s them into `@NYC_TLC_STAGE/yellow/`. Replaces the manual SnowSQL approach below. |
+| `load_weather_to_snowflake.py` | Downloads the NOAA GHCN-Daily CSV for Central Park (USW00094728) and `write_pandas`s the seven required columns into `RAW.WEATHER_DAILY`. |
+| `diagnose_weather_csv.py` | Prints column names + first 3 rows of the NOAA CSV — useful when NOAA changes their format. |
+| `config_snowflake.yaml` | Connection config (`${ENV_VAR}` style) — secrets are read from `~/.anthropic/.env` or the project root `.env`. |
 
 ```bash
-# Authenticate to your Snowflake account
+# From the repo root, with your venv active
+python infra/snowflake/load_tlc_to_stage.py        # uploads parquet to stage
+python infra/snowflake/load_weather_to_snowflake.py # weather CSV → table
+```
+
+These reuse the same `SnowflakeConnector` (key-pair auth preferred) so the credential setup that works for dbt + the ML pipeline works here too.
+
+### Option 2 — Manual SnowSQL
+
+```bash
 snowsql -a <your-account-id> -u <your-user>
 
-# Inside the SnowSQL prompt:
 USE WAREHOUSE LOADING;
 USE DATABASE TAXI_PORTFOLIO;
 USE SCHEMA RAW;
 
-# Upload all yellow taxi parquet files (adjust glob to your local path)
 PUT 'file:///Users/marcalexander/Downloads/yellow_tripdata_*.parquet'
     @NYC_TLC_STAGE/yellow/
     AUTO_COMPRESS=TRUE
     OVERWRITE=TRUE;
 
-# Verify they're staged
 LIST @NYC_TLC_STAGE/yellow/;
 ```
 
-After that, `03_load_data.sql` can run the `COPY INTO`.
+After either option, `03_load_data.sql` runs the `COPY INTO`.
 
 ## Verification queries (built into `03_load_data.sql`)
 
